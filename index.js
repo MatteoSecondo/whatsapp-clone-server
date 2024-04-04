@@ -71,7 +71,7 @@ app.get('/users/populate', validateToken, async (req, res) => {
     res.status(200).send({user: data})
 })
 
-app.get('/users/:name', async (req, res) => {
+app.get('/users/:name', validateToken, async (req, res) => {
     const data = await Users.find({name: req.params.name}, 'name')
     res.status(200).send(data)
 })
