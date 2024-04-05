@@ -1,7 +1,7 @@
 import mongoose from "mongoose"
 
 const messageSchema = mongoose.Schema({
-    message: String,
+    text: String,
     timestamp: String,
     audio: String,
     sender: {

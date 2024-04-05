@@ -45,7 +45,7 @@ app.post('/users/login', async (req, res) => {
     const data = await Users.findOne({googleId: req.body.googleId})
 
     if (data) {
-        const accesToken = jwt.sign({user: data}, "RXxbKgsy9SqI2S6x1et3")
+        const accesToken = jwt.sign({data}, "RXxbKgsy9SqI2S6x1et3")
         res.status(200).send({token: accesToken, user: data})
     }
     else {
@@ -56,19 +56,19 @@ app.post('/users/login', async (req, res) => {
             picture: req.body.picture,
         })
 
-        const accesToken = jwt.sign({user: data}, "RXxbKgsy9SqI2S6x1et3");
+        const accesToken = jwt.sign({data}, "RXxbKgsy9SqI2S6x1et3");
         res.status(201).send({token: accesToken, user: data})
         }
 })
 
 app.get('/users/auth', validateToken, async (req, res) => {
-    const data = await Users.findById(req.user.user._id).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
-    res.status(200).send({user: data})
+    const data = await Users.findById(req.user.data._id).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
+    res.status(200).send(data)
 })
 
 app.get('/users/populate', validateToken, async (req, res) => {
-    const data = await Users.findById(req.user.user._id).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
-    res.status(200).send({user: data})
+    const data = await Users.findById(req.user.data._id).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
+    res.status(200).send(data)
 })
 
 app.get('/users/:name', validateToken, async (req, res) => {
@@ -77,10 +77,10 @@ app.get('/users/:name', validateToken, async (req, res) => {
 })
 
 app.get('/chats/create/:participantId', validateToken, async (req, res) => {
-    const data = await Chats.create({participants: [req.params.participantId, req.user.user._id]})
+    const data = await Chats.create({participants: [req.params.participantId, req.user.data._id]})
     await data.populate('participants')
     await Users.findByIdAndUpdate(req.params.participantId, {$push: {chats: data._id}})
-    await Users.findByIdAndUpdate(req.user.user._id, {$push: {chats: data._id}})
+    await Users.findByIdAndUpdate(req.user.data._id, {$push: {chats: data._id}})
     res.status(200).send(data)
 })
 
@@ -91,9 +91,30 @@ const io = new Server(server, {
     cors: {
       origin: "http://localhost:3000"
     }
-  })
+})
 
 io.on('connection', (socket) => {
+  
+    socket.on('join', (chatId) => {
+        socket.join(chatId)
+    })
+  
+    socket.on('client-server', async ({ chatId, message }) => {
+        try {
+            const data = await Messages.create(message)
+            data.populate('sender')
+            await Chats.findByIdAndUpdate(chatId, {$push: {messages: data._id}})
+            io.to(chatId).emit('server-client', data)
+        } catch (error) {
+            console.log(error)
+        }
+    })
+  
+    /*socket.on('disconnect', () => {
+    })*/
+})
+
+/*io.on('connection', (socket) => {
     socket.on('send-message', async (object) => {
         const decryptedData = decryptData(object.message, '3M/IwH6UeOARJ3m3Ap18rg==')
         const data = await Messages.create(decryptedData)
@@ -102,4 +123,4 @@ io.on('connection', (socket) => {
         const encryptedData = encryptData(data, '3M/IwH6UeOARJ3m3Ap18rg==')
         io.emit('new-message', encryptedData)
     })
-})
+})*/
