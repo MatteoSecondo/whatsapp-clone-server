@@ -38,7 +38,7 @@ await mongoose.connect(connection_url)
 
 //routes
 app.get('/', (req, res) => {
-    res.status(200).send('Hello world!')
+    res.status(200).send('Welcome to Whatsapp-Clone!')
 })
 
 app.post('/users/login', async (req, res) => {
@@ -72,7 +72,7 @@ app.get('/users/populate', validateToken, async (req, res) => {
 })
 
 app.get('/users/:name', validateToken, async (req, res) => {
-    const data = await Users.find({name: req.params.name}, 'name')
+    const data = await Users.find({name: { $regex: `^${req.params.name}`, $options: 'i' }}, 'name')
     res.status(200).send(data)
 })
 
@@ -101,10 +101,12 @@ io.on('connection', (socket) => {
   
     socket.on('client-server', async ({ chatId, message }) => {
         try {
-            const data = await Messages.create(message)
-            data.populate('sender')
+            const decryptedData = decryptData(message, '3M/IwH6UeOARJ3m3Ap18rg==')
+            const data = await Messages.create(decryptedData)
+            await data.populate('sender')
             await Chats.findByIdAndUpdate(chatId, {$push: {messages: data._id}})
-            io.to(chatId).emit('server-client', data)
+            const encryptedData = encryptData(data, '3M/IwH6UeOARJ3m3Ap18rg==')
+            io.to(chatId).emit('server-client', encryptedData)
         } catch (error) {
             console.log(error)
         }
@@ -113,14 +115,3 @@ io.on('connection', (socket) => {
     /*socket.on('disconnect', () => {
     })*/
 })
-
-/*io.on('connection', (socket) => {
-    socket.on('send-message', async (object) => {
-        const decryptedData = decryptData(object.message, '3M/IwH6UeOARJ3m3Ap18rg==')
-        const data = await Messages.create(decryptedData)
-        data.populate('sender')
-        await Chats.findByIdAndUpdate(object.chatId, {$push: {messages: data._id}})
-        const encryptedData = encryptData(data, '3M/IwH6UeOARJ3m3Ap18rg==')
-        io.emit('new-message', encryptedData)
-    })
-})*/
