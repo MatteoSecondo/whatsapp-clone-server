@@ -84,6 +84,11 @@ app.get('/chats/create/:participantId', validateToken, async (req, res) => {
     res.status(200).send(data)
 })
 
+app.get('/messages/:id', validateToken, async (req, res) => {
+    const data = await Messages.findByIdAndUpdate(req.params.id, {isRead: true}, {new: true, projection: {isRead: 1}})
+    res.status(200).send(data)
+})
+
 //listening
 const server = app.listen(port, () => console.log(`Listening on port ${port}`))
 
@@ -91,6 +96,19 @@ const io = new Server(server, {
     cors: {
       origin: "http://localhost:3000"
     }
+})
+
+const changeStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
+    
+    const changedMessage = changeData.fullDocument
+
+    if (changeData.operationType === 'update' && changedMessage.hasOwnProperty('isRead')) {  
+        io.emit('message-read', changedMessage.isRead)
+    }
+})
+
+changeStream.on('error', (error) => {
+    console.error(error)
 })
 
 io.on('connection', (socket) => {
@@ -111,7 +129,4 @@ io.on('connection', (socket) => {
             console.log(error)
         }
     })
-  
-    /*socket.on('disconnect', () => {
-    })*/
 })
