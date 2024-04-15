@@ -1,6 +1,7 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import cors from 'cors'
+import 'dotenv/config'
 import { Server } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import CryptoJS from 'crypto-js'
@@ -13,7 +14,7 @@ import Messages from './models/Messages.js'
 //configuration
 const app = express()
 const port = process.env.PORT || 9000
-const connection_url = 'mongodb+srv://webprogramming222:dlDK3clsdD6nIYw7@cluster0.8ap4sfm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'
+const connection_url = process.env.CONNECTION_URL
 
 //middlewares
 app.use(express.json())
@@ -84,8 +85,8 @@ app.get('/chats/create/:participantId', validateToken, async (req, res) => {
     res.status(200).send(data)
 })
 
-app.get('/messages/:id', validateToken, async (req, res) => {
-    const data = await Messages.findByIdAndUpdate(req.params.id, {isRead: true}, {new: true, projection: {isRead: 1}})
+app.put('/messages/seen', validateToken, async (req, res) => {
+    const data = await Messages.findByIdAndUpdate(req.body.messageId, {isRead: true}, {new: true, projection: {isRead: 1}})
     res.status(200).send(data)
 })
 
@@ -94,7 +95,7 @@ const server = app.listen(port, () => console.log(`Listening on port ${port}`))
 
 const io = new Server(server, {
     cors: {
-      origin: "http://localhost:3000"
+      origin: "*"
     }
 })
 
@@ -103,7 +104,7 @@ const changeStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change
     const changedMessage = changeData.fullDocument
 
     if (changeData.operationType === 'update' && changedMessage.hasOwnProperty('isRead')) {  
-        io.emit('message-read', changedMessage.isRead)
+        io.to(changedMessage.chat.toString()).emit('message-read', {value: changedMessage.isRead, messageId: changedMessage._id})
     }
 })
 
@@ -117,14 +118,14 @@ io.on('connection', (socket) => {
         socket.join(chatId)
     })
   
-    socket.on('client-server', async ({ chatId, message }) => {
+    socket.on('client-server', async (message) => {
         try {
-            const decryptedData = decryptData(message, '3M/IwH6UeOARJ3m3Ap18rg==')
+            const decryptedData = decryptData(message, process.env.ENCRYPTION_KEY)
             const data = await Messages.create(decryptedData)
             await data.populate('sender')
-            await Chats.findByIdAndUpdate(chatId, {$push: {messages: data._id}})
-            const encryptedData = encryptData(data, '3M/IwH6UeOARJ3m3Ap18rg==')
-            io.to(chatId).emit('server-client', encryptedData)
+            await Chats.findByIdAndUpdate(data.chat, {$push: {messages: data._id}})
+            const encryptedData = encryptData(data, process.env.ENCRYPTION_KEY)
+            io.to(data.chat.toString()).emit('server-client', encryptedData)
         } catch (error) {
             console.log(error)
         }
