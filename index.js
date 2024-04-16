@@ -46,7 +46,7 @@ app.post('/users/login', async (req, res) => {
     const data = await Users.findOne({googleId: req.body.googleId})
 
     if (data) {
-        const accesToken = jwt.sign({data}, "RXxbKgsy9SqI2S6x1et3")
+        const accesToken = jwt.sign({data}, process.env.JWT_STRING)
         res.status(200).send({token: accesToken, user: data})
     }
     else {
@@ -57,7 +57,7 @@ app.post('/users/login', async (req, res) => {
             picture: req.body.picture,
         })
 
-        const accesToken = jwt.sign({data}, "RXxbKgsy9SqI2S6x1et3");
+        const accesToken = jwt.sign({data}, process.env.JWT_STRING)
         res.status(201).send({token: accesToken, user: data})
         }
 })
