@@ -155,4 +155,8 @@ io.on('connection', (socket) => {
     socket.on('onlineStatus c-s', async ({ isOnline, lastAccess, chatId }) => {
         socket.to(chatId).emit('onlineStatus s-c', {isOnline: isOnline, lastAccess: lastAccess})
     })
+
+    socket.on('isTyping c-s', ({ isTyping, chatId }) => {
+        socket.to(chatId).emit('isTyping s-c', { value: isTyping })
+    })
 })
