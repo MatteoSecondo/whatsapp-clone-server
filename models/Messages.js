@@ -2,7 +2,7 @@ import mongoose from "mongoose"
 
 const messageSchema = mongoose.Schema({
     text: String,
-    timestamp: String,
+    timestamp: Date,
     audio: String,
     isRead: Boolean,
     sender: {

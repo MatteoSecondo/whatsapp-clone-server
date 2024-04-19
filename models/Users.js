@@ -5,6 +5,8 @@ const userSchema = mongoose.Schema({
     name: String,
     email: String,
     picture: String,
+    isOnline: Boolean,
+    lastAccess: Date,
     chats: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'chats'

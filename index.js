@@ -43,7 +43,7 @@ app.get('/', (req, res) => {
 })
 
 app.post('/users/login', async (req, res) => {
-    const data = await Users.findOne({googleId: req.body.googleId})
+    const data = await Users.findOneAndUpdate({googleId: req.body.googleId}, {isOnline: true})
 
     if (data) {
         const accesToken = jwt.sign({data}, process.env.JWT_STRING)
@@ -55,6 +55,8 @@ app.post('/users/login', async (req, res) => {
             name: req.body.name,
             email: req.body.email,
             picture: req.body.picture,
+            isOnline: true,
+            lastAccess: new Date(Date.now())
         })
 
         const accesToken = jwt.sign({data}, process.env.JWT_STRING)
@@ -63,12 +65,17 @@ app.post('/users/login', async (req, res) => {
 })
 
 app.get('/users/auth', validateToken, async (req, res) => {
-    const data = await Users.findById(req.user.data._id).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
+    const data = await Users.findByIdAndUpdate(req.user.data._id, {isOnline: true}).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
     res.status(200).send(data)
 })
 
 app.get('/users/populate', validateToken, async (req, res) => {
     const data = await Users.findById(req.user.data._id).populate({path: 'chats', populate: [{path: 'participants'}, {path: 'messages', populate: {path: 'sender'}}]})
+    res.status(200).send(data)
+})
+
+app.put('/users/logout', validateToken, async (req, res) => {
+    const data = await Users.findByIdAndUpdate(req.user.data._id, {isOnline: false, lastAccess: new Date(Date.now())})
     res.status(200).send(data)
 })
 
@@ -99,7 +106,7 @@ const io = new Server(server, {
     }
 })
 
-const changeStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
+const messageStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
     
     const changedMessage = changeData.fullDocument
 
@@ -108,7 +115,21 @@ const changeStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change
     }
 })
 
-changeStream.on('error', (error) => {
+messageStream.on('error', (error) => {
+    console.error(error)
+})
+
+const userStream = Users.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
+    const changedUser = changeData.fullDocument
+
+    if (changeData.operationType === 'update' && !changedUser.isOnline) {
+        changedUser.chats.forEach(chat => {
+            io.to(chat.toString()).emit('onlineStatus s-c', {isOnline: changedUser.isOnline, lastAccess: changedUser.lastAccess})
+        })
+    }
+})
+
+userStream.on('error', (error) => {
     console.error(error)
 })
 
@@ -129,5 +150,9 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.log(error)
         }
+    })
+
+    socket.on('onlineStatus c-s', async ({ isOnline, lastAccess, chatId }) => {
+        socket.to(chatId).emit('onlineStatus s-c', {isOnline: isOnline, lastAccess: lastAccess})
     })
 })
