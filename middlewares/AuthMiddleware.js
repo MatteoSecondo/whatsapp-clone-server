@@ -8,7 +8,7 @@ const validateToken = (req, res, next) => {
     }
     
     try{
-        const validToken = jwt.verify(accessToken, "RXxbKgsy9SqI2S6x1et3")
+        const validToken = jwt.verify(accessToken, process.env.JWT_STRING)
         req.user = validToken
 
         if(validToken){

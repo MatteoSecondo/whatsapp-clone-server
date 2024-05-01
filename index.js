@@ -106,19 +106,6 @@ const io = new Server(server, {
     }
 })
 
-const messageStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
-    
-    const changedMessage = changeData.fullDocument
-
-    if (changeData.operationType === 'update' && changedMessage.hasOwnProperty('isRead')) {  
-        io.to(changedMessage.chat.toString()).emit('message-read', {value: changedMessage.isRead, messageId: changedMessage._id})
-    }
-})
-
-messageStream.on('error', (error) => {
-    console.error(error)
-})
-
 const userStream = Users.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
     const changedUser = changeData.fullDocument
 
@@ -133,10 +120,36 @@ userStream.on('error', (error) => {
     console.error(error)
 })
 
+const chatStream = Chats.watch({ fullDocument: 'updateLookup' }).on('change', async (newData) => {
+    
+    const newChatId = newData.fullDocument._id
+    const newChat = await Chats.findById(newChatId).populate('participants')
+    if (newData.operationType === 'insert') { 
+        io.to(newChat.participants[0]._id.toString()).emit('newChat', newChat)
+    }
+})
+
+chatStream.on('error', (error) => {
+    console.error(error)
+})
+
+const messageStream = Messages.watch({ fullDocument: 'updateLookup' }).on('change', changeData => {
+    
+    const changedMessage = changeData.fullDocument
+
+    if (changeData.operationType === 'update' && changedMessage.hasOwnProperty('isRead')) {  
+        io.to(changedMessage.chat.toString()).emit('message-read', {value: changedMessage.isRead, messageId: changedMessage._id})
+    }
+})
+
+messageStream.on('error', (error) => {
+    console.error(error)
+})
+
 io.on('connection', (socket) => {
   
-    socket.on('join', (chatId) => {
-        socket.join(chatId)
+    socket.on('join', (id) => {
+        socket.join(id)
     })
   
     socket.on('client-server', async (message) => {
