@@ -123,8 +123,8 @@ userStream.on('error', (error) => {
 const chatStream = Chats.watch({ fullDocument: 'updateLookup' }).on('change', async (newData) => {
     
     const newChatId = newData.fullDocument._id
-    const newChat = await Chats.findById(newChatId).populate('participants')
-    if (newData.operationType === 'insert') { 
+    const newChat = await Chats.findById(newChatId).populate([{path: 'participants'}, {path: 'messages'}])
+    if (newData.operationType === 'update' && newData.fullDocument.messages.length === 1) { 
         io.to(newChat.participants[0]._id.toString()).emit('newChat', newChat)
     }
 })
